@@ -80,6 +80,7 @@ internal sealed interface AiProviderDetailAction {
     data class TabSelected(val index: Int) : AiProviderDetailAction
     data class ModelQueryChanged(val query: String) : AiProviderDetailAction
     data object RefreshModels : AiProviderDetailAction
+    data object AddManualModel : AiProviderDetailAction
     data object ToggleVisibleModelSelection : AiProviderDetailAction
     data object Back : AiProviderDetailAction
     data class EditModel(val modelId: String) : AiProviderDetailAction
@@ -207,6 +208,11 @@ private fun AiProviderModelsTab(
             onBack = { onAction(AiProviderDetailAction.Back) },
             modifier = Modifier.padding(horizontal = 16.dp),
         ) {
+            NgFloatingToolbarActionButton(
+                iconRes = R.drawable.ic_add,
+                contentDescription = stringResource(R.string.ai_add_manual_model),
+                onClick = { onAction(AiProviderDetailAction.AddManualModel) },
+            )
             NgFloatingToolbarActionButton(
                 iconRes = if (state.allVisibleModelsSelected) {
                     R.drawable.ic_block_outline

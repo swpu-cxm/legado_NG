@@ -49,10 +49,13 @@ object AiManager {
 
     suspend fun fetchAndSaveModels(providerId: String): List<AiModel> {
         val models = listModels(providerId)
-        if (models.isEmpty()) return models
         val setting = AiProviderStore.provider(providerId) ?: error("AI provider not found: $providerId")
-        AiProviderStore.saveProvider(setting.withFetchedModels(models))
-        return models
+        if (models.isEmpty() && setting.manualModelIds.isEmpty()) {
+            return models
+        }
+        val updated = setting.withFetchedModels(models)
+        AiProviderStore.saveProvider(updated)
+        return updated.models
     }
 
     suspend fun refreshEnabledProviderModels(): AiModelBatchRefreshResult {
@@ -154,14 +157,15 @@ object AiManager {
 }
 
 internal fun AiProviderSetting.withFetchedModels(models: List<AiModel>): AiProviderSetting {
-    val modelIds = models.map { it.id }.toSet()
+    val merged = mergeFetchedModelsWithManual(models)
+    val modelIds = merged.map { it.id }.toSet()
     val availableModelIds = if (availableModelSelectionInitialized) {
         availableModelIds.filter { it in modelIds }
     } else {
-        models.map { it.id }
+        merged.map { it.id }
     }
     return copy(
-        models = models,
+        models = merged,
         availableModelIds = availableModelIds,
         availableModelSelectionInitialized = true
     )

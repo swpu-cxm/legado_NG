@@ -120,6 +120,16 @@ android {
             dimension "mode"
             manifestPlaceholders.put("APP_CHANNEL_VALUE", "app")
         }
+        gxj {
+            dimension "mode"
+            manifestPlaceholders.put("APP_CHANNEL_VALUE", "gxj")
+        }
+    }
+
+    androidComponents {
+        onVariants(selector().withFlavor("mode", "gxj")) { variant ->
+            variant.applicationId.set("io.legado.app.ng.gxj")
+        }
     }
 
     android.applicationVariants.configureEach { variant ->

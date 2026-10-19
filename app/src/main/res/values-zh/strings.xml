@@ -621,6 +621,14 @@
     <string name="ai_model_tag_modality">%1$s > %2$s</string>
     <string name="ai_model_tag_tool">工具</string>
     <string name="ai_model_tag_reasoning">推理</string>
+    <string name="ai_add_manual_model">手动添加模型</string>
+    <string name="ai_add_manual_model_title">添加模型 ID</string>
+    <string name="ai_add_manual_model_hint">例如 glm-4-flash-250414</string>
+    <string name="ai_add_manual_model_summary">添加提供商模型列表接口未返回的模型 ID，刷新列表后仍会保留。</string>
+    <string name="ai_manual_model_exists">该模型 ID 已存在</string>
+    <string name="ai_manual_model_added">已添加模型</string>
+    <string name="ai_remove_manual_model">移除</string>
+    <string name="ai_remove_manual_model_confirm">移除手动添加的模型「%1$s」？</string>
     <string name="ai_fetch_models">获取模型列表</string>
     <string name="ai_refresh_all_models">刷新所有模型</string>
     <string name="ai_refresh_models_result">成功 %1$d 家（%2$d 个模型），失败 %3$d 家，未配置密钥 %4$d 家</string>

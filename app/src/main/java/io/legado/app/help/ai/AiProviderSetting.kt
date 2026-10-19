@@ -57,7 +57,9 @@ data class AiProviderSetting(
     @SerializedName(value = "streamResponseEnabled", alternate = ["x"])
     val streamResponseEnabled: Boolean = false,
     @SerializedName("supportsStreamUsage")
-    val supportsStreamUsage: Boolean = false
+    val supportsStreamUsage: Boolean = false,
+    @SerializedName(value = "manualModelIds", alternate = ["y"])
+    val manualModelIds: List<String> = emptyList(),
 )
 
 enum class AiProviderType(val prefValue: String, val displayName: String) {

@@ -44,6 +44,8 @@ internal data class AiModelEditDraft(
 internal fun AiModelEditSheet(
     model: AiModel,
     onSave: (AiModelEditDraft) -> Unit,
+    manualModel: Boolean = false,
+    onRemoveManual: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var displayName by remember(model) { mutableStateOf(model.displayName()) }
@@ -96,6 +98,12 @@ internal fun AiModelEditSheet(
             actionActive = true,
             onActionClick = save,
             centerTitle = true,
+            secondaryTrailingActionText = if (manualModel && onRemoveManual != null) {
+                stringResource(R.string.ai_remove_manual_model)
+            } else {
+                null
+            },
+            onSecondaryTrailingActionClick = onRemoveManual,
         )
         NgFormPanel(
             modifier = Modifier

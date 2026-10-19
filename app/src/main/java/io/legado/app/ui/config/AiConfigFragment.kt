@@ -29,6 +29,9 @@ import io.legado.app.databinding.FragmentAiConfigBinding
 import io.legado.app.data.appDb
 import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.ai.AiManager
+import io.legado.app.help.ai.isManualModel
+import io.legado.app.help.ai.withManualModelAdded
+import io.legado.app.help.ai.withManualModelRemoved
 import io.legado.app.help.ai.AiModel
 import io.legado.app.help.ai.AiModelAbility
 import io.legado.app.help.ai.AiModelModality
@@ -922,6 +925,8 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
     }
 
     private fun showModelEditDialog(provider: AiProviderSetting, model: AiModel) {
+        val modelId = model.safeId()
+        val manualModel = provider.isManualModel(modelId)
         val dialog = BottomSheetDialog(requireContext())
         dialog.setContentView(
             requireContext().createNgBottomDrawerComposeHost(
@@ -930,6 +935,15 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             ) {
                 AiModelEditSheet(
                     model = model,
+                    manualModel = manualModel,
+                    onRemoveManual = if (manualModel) {
+                        {
+                            dialog.dismiss()
+                            confirmRemoveManualModel(provider, modelId)
+                        }
+                    } else {
+                        null
+                    },
                     onSave = { draft ->
                         saveModelEdit(provider, model, draft)
                         dialog.dismiss()
@@ -939,6 +953,85 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         )
         configureModelEditSheet(dialog)
         dialog.showWithAppNavigationBarVisibility()
+    }
+
+    private fun showManualModelIdDialog() {
+        val dialog = ComponentDialog(requireContext())
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        val composeView = androidx.compose.ui.platform.ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                NgAppTheme(updateSystemBars = false) {
+                    BackupTextInputDialogContent(
+                        title = getString(R.string.ai_add_manual_model_title),
+                        initialValue = "",
+                        placeholder = getString(R.string.ai_add_manual_model_hint),
+                        cancelText = getString(android.R.string.cancel),
+                        confirmText = getString(android.R.string.ok),
+                        password = false,
+                        message = getString(R.string.ai_add_manual_model_summary),
+                        onCancel = { dialog.dismiss() },
+                        onConfirm = { value ->
+                            dialog.dismiss()
+                            addManualModelId(value)
+                        },
+                    )
+                }
+            }
+        }
+        dialog.setContentView(composeView)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.show()
+        dialog.applyNgWindow()
+    }
+
+    private fun addManualModelId(rawId: String) {
+        val provider = currentProviderId?.let { AiProviderStore.provider(it) } ?: return
+        val modelId = rawId.trim()
+        if (modelId.isBlank()) {
+            return
+        }
+        if (provider.displayModels().any { it.safeId() == modelId }) {
+            Toast.makeText(
+                requireContext(),
+                R.string.ai_manual_model_exists,
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+        runCatching { provider.withManualModelAdded(modelId) }
+            .onSuccess { updated ->
+                AiProviderStore.saveProvider(updated)
+                refreshModelList(AiProviderStore.provider(provider.id))
+                refreshMain()
+                Toast.makeText(
+                    requireContext(),
+                    R.string.ai_manual_model_added,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+            .onFailure { error ->
+                showAiClassicDialog(
+                    title = getString(R.string.ai_add_manual_model_title),
+                    message = error.localizedMessage ?: error.toString(),
+                )
+            }
+    }
+
+    private fun confirmRemoveManualModel(provider: AiProviderSetting, modelId: String) {
+        showAiClassicDialog(
+            title = getString(R.string.ai_remove_manual_model),
+            message = getString(R.string.ai_remove_manual_model_confirm, modelId),
+            cancelText = getString(android.R.string.cancel),
+            confirmText = getString(R.string.ai_remove_manual_model),
+            dismissBeforeConfirm = true,
+            onConfirm = {
+                val updated = provider.withManualModelRemoved(modelId)
+                AiProviderStore.saveProvider(updated)
+                refreshModelList(AiProviderStore.provider(provider.id))
+                refreshMain()
+            },
+        )
     }
 
     private fun initFeatureSettingsCompose() {
@@ -1117,6 +1210,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                 refreshModelList(currentProviderId?.let { AiProviderStore.provider(it) })
             }
             AiProviderDetailAction.RefreshModels -> fetchModels()
+            AiProviderDetailAction.AddManualModel -> showManualModelIdDialog()
             AiProviderDetailAction.ToggleVisibleModelSelection -> toggleVisibleModelSelection()
             AiProviderDetailAction.Back -> {
                 requireActivity().onBackPressedDispatcher.onBackPressed()
