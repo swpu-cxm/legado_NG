@@ -624,6 +624,14 @@
     <string name="ai_model_tag_modality">%1$s > %2$s</string>
     <string name="ai_model_tag_tool">Tools</string>
     <string name="ai_model_tag_reasoning">Reasoning</string>
+    <string name="ai_add_manual_model">Add model manually</string>
+    <string name="ai_add_manual_model_title">Add model ID</string>
+    <string name="ai_add_manual_model_hint">e.g. glm-4-flash-250414</string>
+    <string name="ai_add_manual_model_summary">Add a model ID that is not returned by the provider model list API. It will stay after refreshing the list.</string>
+    <string name="ai_manual_model_exists">This model ID already exists</string>
+    <string name="ai_manual_model_added">Model added</string>
+    <string name="ai_remove_manual_model">Remove</string>
+    <string name="ai_remove_manual_model_confirm">Remove manually added model \"%1$s\"?</string>
     <string name="ai_fetch_models">Fetch model list</string>
     <string name="ai_refresh_all_models">Refresh all models</string>
     <string name="ai_refresh_models_result">Updated %1$d providers (%2$d models); %3$d failed, %4$d without an API key</string>

@@ -165,4 +165,26 @@ class AiProviderSettingTest {
         ).withFetchedModels(models)
         assertEquals(models.map { it.id }, firstFetch.availableModelIds)
     }
+
+    @Test
+    fun fetchedModelsMergeManualModelsAndPreserveAfterRefresh() {
+        val fetched = listOf(AiModel("glm-4-flash"), AiModel("glm-4-plus"))
+        val provider = AiDefaultProviders.all().first { it.id == "zhipu" }
+            .withManualModelAdded("glm-4-flash-250414")
+
+        val refreshed = provider.withFetchedModels(fetched)
+        val ids = refreshed.models.map { it.id }
+        assertTrue("glm-4-flash-250414" in ids)
+        assertEquals(3, refreshed.models.size)
+        assertTrue(refreshed.availableModelIds.contains("glm-4-flash-250414"))
+    }
+
+    @Test
+    fun removeManualModelClearsIdFromProvider() {
+        val provider = AiDefaultProviders.all().first().withManualModelAdded("custom-chat")
+        val removed = provider.withManualModelRemoved("custom-chat")
+        assertTrue(removed.manualModelIds.isEmpty())
+        assertTrue(removed.models.none { it.id == "custom-chat" })
+        assertFalse(removed.availableModelIds.contains("custom-chat"))
+    }
 }
