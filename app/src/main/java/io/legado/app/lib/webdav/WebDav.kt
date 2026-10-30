@@ -64,6 +64,7 @@ open class WebDav(
                     <a:getcontentlength/>
                     <a:creationdate/>
                     <a:getlastmodified/>
+                    <a:getetag/>
                     %s
                 </a:prop>
             </a:propfind>"""
@@ -78,6 +79,7 @@ open class WebDav(
             </propfind>"""
 
         private const val DEFAULT_CONTENT_TYPE = "application/octet-stream"
+        internal const val DEPTH_INFINITY = Int.MIN_VALUE
     }
 
 
@@ -122,7 +124,7 @@ open class WebDav(
      */
     @Throws(WebDavException::class)
     suspend fun getWebDavFile(): WebDavFile? {
-        return propFindResponse(depth = 0)?.let {
+        return propFindResponse(depth = 0, allowMissing = true)?.let {
             parseBody(it).firstOrNull()
         }
     }
@@ -134,20 +136,39 @@ open class WebDav(
     @Throws(WebDavException::class)
     suspend fun listFiles(): List<WebDavFile> {
         propFindResponse()?.let { body ->
+            val requested = httpUrl!!.toHttpUrl()
             return parseBody(body).filter {
-                it.path != path
+                val entry = it.path.toHttpUrl()
+                entry.scheme != requested.scheme || entry.host != requested.host || entry.port != requested.port ||
+                    entry.pathSegments.dropLastWhile(String::isEmpty) != requested.pathSegments.dropLastWhile(String::isEmpty)
+            }
+        }
+        return emptyList()
+    }
+
+    /** Depth: infinity — 适用于 OpenList / AList 等递归列目录 */
+    @Throws(WebDavException::class)
+    suspend fun listFilesDeep(): List<WebDavFile> {
+        propFindResponse(depth = DEPTH_INFINITY)?.let { body ->
+            val requested = httpUrl!!.toHttpUrl()
+            val rootPrefix = requested.encodedPath.trimEnd('/')
+            return parseBody(body).filter { file ->
+                if (file.path == path) return@filter false
+                val entry = runCatching { file.path.toHttpUrl() }.getOrNull() ?: return@filter false
+                entry.scheme == requested.scheme && entry.host == requested.host && entry.port == requested.port &&
+                    (entry.encodedPath == requested.encodedPath ||
+                        entry.encodedPath.startsWith(rootPrefix + "/"))
             }
         }
         return emptyList()
     }
 
     /**
-     * @param propsList 指定列出文件的哪些属性
-     */
     @Throws(WebDavException::class)
     private suspend fun propFindResponse(
         propsList: List<String> = emptyList(),
-        depth: Int = 1
+        depth: Int = 1,
+        allowMissing: Boolean = false,
     ): String? {
         val requestProps = StringBuilder()
         for (p in propsList) {
@@ -159,16 +180,19 @@ open class WebDav(
             String.format(DIR, requestProps.toString() + "\n")
         }
         val url = httpUrl ?: return null
+        val depthHeader = if (depth == DEPTH_INFINITY) "infinity" else depth.toString()
         return webDavClient.newCallResponse {
             url(url)
-            addHeader("Depth", depth.toString())
+            addHeader("Depth", depthHeader)
             // 添加RequestBody对象，可以只返回的属性。如果设为null，则会返回全部属性
             // 注意：尽量手动指定需要返回的属性。若返回全部属性，可能后由于Prop.java里没有该属性名，而崩溃。
             val requestBody = requestPropsStr.toRequestBody("text/plain".toMediaType())
             method("PROPFIND", requestBody)
-        }.apply {
-            checkResult(this)
-        }.body.text()
+        }.use { response ->
+            if (allowMissing && response.code == 404) return null
+            checkResult(response)
+            response.body.text()
+        }
     }
 
     /**
@@ -184,12 +208,11 @@ open class WebDav(
         val ns = document.findNSPrefix("DAV:")
         val elements = document.findNS("response", ns)
         val urlStr = httpUrl ?: return list
-        val baseUrl = NetworkUtils.getBaseUrl(urlStr)
         for (element in elements) {
             //依然是优化支持 caddy 自建的 WebDav ，其目录后缀都为“/”, 所以删除“/”的判定，不然无法获取该目录项
             val href = element.findNS("href", ns)[0].text()
             val hrefDecode = URLDecoder.decodeForPath(href, Charsets.UTF_8)
-            val fileName = hrefDecode.removeSuffix("/").substringAfterLast("/")
+            val fileName = URLDecoder.decodeForPath(href.removeSuffix("/").substringAfterLast("/"), Charsets.UTF_8)
             val webDavFile: WebDav
             try {
                 val urlName = hrefDecode.ifEmpty {
@@ -198,7 +221,7 @@ open class WebDav(
                 val displayName = element
                     .findNS("displayname", ns)
                     .firstOrNull()?.text()?.takeIf { it.isNotEmpty() }
-                    ?.let { URLDecoder.decodeForPath(it, Charsets.UTF_8) } ?: fileName
+                    ?: fileName
                 val contentType = element
                     .findNS("getcontenttype", ns)
                     .firstOrNull()?.text().orEmpty()
@@ -216,7 +239,8 @@ open class WebDav(
                                 .toInstant().toEpochMilli()
                         }
                 }.getOrNull() ?: 0
-                var fullURL = NetworkUtils.getAbsoluteURL(baseUrl, hrefDecode)
+                // Decode names for display only; reserved characters must stay escaped in URLs.
+                var fullURL = NetworkUtils.getAbsoluteURL(urlStr, href)
                 if (WebDavFile.isDir(contentType, resourceType) && !fullURL.endsWith("/")) {
                     fullURL += "/"
                 }
@@ -228,7 +252,8 @@ open class WebDav(
                     size = size,
                     contentType = contentType,
                     resourceType = resourceType,
-                    lastModify = lastModify
+                    lastModify = lastModify,
+                    etag = element.findNS("getetag", ns).firstOrNull()?.text()?.takeIf { it.isNotBlank() },
                 )
                 list.add(webDavFile)
             } catch (e: MalformedURLException) {
@@ -402,6 +427,28 @@ open class WebDav(
             checkResult(this)
         }.body.byteStream()
         return byteStream
+    }
+
+    /** Caller owns a freshly created collection; the condition is an extra guard where supported. */
+    internal suspend fun uploadBookSnapshot(uri: Uri, contentType: String) = withContext(IO) {
+        val target = httpUrl ?: throw WebDavException("url不能为空")
+        webDavClient.newCallResponse {
+            url(target)
+            header("If-None-Match", "*")
+            put(uri.toRequestBody(contentType.toMediaType()))
+        }.use { checkResult(it) }
+    }
+
+    /** Create a generated collection after the caller has checked its unique path is absent. */
+    internal suspend fun createBookCollection() = withContext(IO) {
+        val target = httpUrl ?: throw WebDavException("url不能为空")
+        webDavClient.newCallResponse {
+            url(target)
+            method("MKCOL", null)
+        }.use { response ->
+            checkResult(response)
+            check(response.code == 201) { "服务器未确认新建书籍目录" }
+        }
     }
 
     /**

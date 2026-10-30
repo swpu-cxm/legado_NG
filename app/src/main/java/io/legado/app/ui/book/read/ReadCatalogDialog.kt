@@ -58,6 +58,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -89,6 +90,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentManager
@@ -113,9 +115,8 @@ import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.bookmark.AllBookmarkFilter
 import io.legado.app.ui.book.bookmark.BookmarkNoteFilter
 import io.legado.app.ui.book.bookmark.buildAllBookmarkCollection
+import io.legado.app.ui.design.components.compose.LocalNgPaneBounds
 import io.legado.app.ui.design.components.compose.NgBottomDrawerSurface
-import io.legado.app.ui.design.components.compose.NgDrawerDefaults
-import io.legado.app.ui.design.components.compose.rememberNgDrawerThemeProfile
 import io.legado.app.ui.design.components.compose.NgDrawerContentCardStyle
 import io.legado.app.ui.design.components.compose.NgDrawerThemeProvider
 import io.legado.app.ui.design.components.compose.NgBookCover
@@ -126,7 +127,6 @@ import io.legado.app.ui.design.components.compose.NgLazyListFastScroller
 import io.legado.app.ui.design.components.compose.NgLazyListFastScrollerVariant
 import io.legado.app.ui.design.components.compose.NgLongDrawerHeader
 import io.legado.app.ui.design.theme.NgAppTheme
-import io.legado.app.ui.design.theme.NgDrawerPalette
 import io.legado.app.ui.design.theme.NgTheme
 import io.legado.app.ui.design.theme.NgThemeSnapshot
 import io.legado.app.utils.observeEvent
@@ -188,6 +188,8 @@ internal abstract class CatalogDrawerDialog : BottomSheetDialogFragment() {
         CatalogDrawerVisualStyle.LISTENING
 
     protected open fun useMangaPanelTheme(): Boolean = false
+
+    protected open fun catalogPaneBounds(): IntRect? = null
 
     protected open fun catalogWindowTheme(): NgThemeSnapshot =
         ReadDrawerStyle.themeSnapshot(requireContext())
@@ -300,15 +302,17 @@ internal abstract class CatalogDrawerDialog : BottomSheetDialogFragment() {
                     onBookmarkDelete = ::deleteBookmark,
                 )
             }
-            if (useMangaPanelTheme()) {
-                NgDrawerThemeProvider(
-                    snapshot = requireNotNull(catalogThemeSnapshot),
-                    contentCardStyle = NgDrawerContentCardStyle.ADAPTIVE,
-                    hasThemeProfile = false,
-                    content = catalogContent,
-                )
-            } else {
-                NgAppTheme(snapshot = catalogThemeSnapshot, updateSystemBars = false, content = catalogContent)
+            CompositionLocalProvider(LocalNgPaneBounds provides catalogPaneBounds()) {
+                if (useMangaPanelTheme()) {
+                    NgDrawerThemeProvider(
+                        snapshot = requireNotNull(catalogThemeSnapshot),
+                        contentCardStyle = NgDrawerContentCardStyle.ADAPTIVE,
+                        hasThemeProfile = false,
+                        content = catalogContent,
+                    )
+                } else {
+                    NgAppTheme(snapshot = catalogThemeSnapshot, updateSystemBars = false, content = catalogContent)
+                }
             }
         }
         loadCatalogData(book)
@@ -638,24 +642,7 @@ private fun ReadCatalogPanel(
         outline?.let { visibleCatalogRows(it, collapsedVolumes, descending) }
     }
     var visibleChapterCount by remember(chapterCount) { mutableStateOf(chapterCount) }
-    val drawerThemeProfile = if (useMangaPanelTheme) null else when (visualStyle) {
-        CatalogDrawerVisualStyle.READING_ORIGINAL -> null
-        CatalogDrawerVisualStyle.READING_COMPACT_SIDE -> null
-        CatalogDrawerVisualStyle.LISTENING -> rememberNgDrawerThemeProfile()
-    }
-    val baseSnapshot = NgTheme.snapshot
-    val drawerAppearance = if (!useMangaPanelTheme && visualStyle == CatalogDrawerVisualStyle.LISTENING) {
-        NgDrawerDefaults.rememberAppearance()
-    } else null
-    val primaryStrength = drawerAppearance?.primaryStrengthPercent ?: 0
-    val drawerColors = remember(baseSnapshot, drawerThemeProfile, primaryStrength) {
-        val backgroundColor = drawerThemeProfile
-            ?.takeIf { !baseSnapshot.isEInk && it.source == "custom_color" }
-            ?.forNight(baseSnapshot.isDark)?.backgroundColor
-        if (backgroundColor == null) baseSnapshot.colors else NgDrawerPalette.applyAdaptiveContentCardRoles(
-            baseSnapshot, primaryStrength, backgroundColor,
-        ).colors
-    }
+    val drawerColors = NgTheme.colors
     val contentColor = Color(drawerColors.onSurface)
     val mutedColor = Color(drawerColors.onSurfaceVariant)
     val accentColor = Color(drawerColors.primary)
@@ -1138,7 +1125,7 @@ private fun ReadCatalogPanel(
             content()
         }
     } else {
-        NgBottomDrawerSurface(modifier = Modifier.fillMaxSize(), themeProfile = drawerThemeProfile) {
+        NgBottomDrawerSurface(modifier = Modifier.fillMaxSize(), themeProfile = null) {
             content()
         }
     }

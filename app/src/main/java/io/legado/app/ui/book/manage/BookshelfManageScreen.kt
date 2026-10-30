@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,8 @@ import androidx.compose.ui.window.DialogProperties
 import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
+import io.legado.app.help.book.summarizeBookGroups
+import io.legado.app.help.config.BookshelfCardAppearanceStore
 import io.legado.app.model.localBook.canExtractOriginalCover
 import io.legado.app.ui.design.components.NgButtonVariant
 import io.legado.app.ui.design.components.NgDialogVariant
@@ -52,6 +55,7 @@ import io.legado.app.ui.design.components.compose.NgDialog
 import io.legado.app.ui.design.components.compose.ngSlideSelect
 import io.legado.app.ui.design.components.compose.rememberNgLazySlideSelectState
 import io.legado.app.ui.design.theme.NgTheme
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -65,6 +69,8 @@ internal fun BookshelfManageScreen(
     cachedChapterCounts: Map<String, Int>,
     cacheChapterTotals: Map<String, Int>,
     clearableBookUrls: Set<String>,
+    cachedBytes: Map<String, Long>,
+    sortOrder: BookshelfManageSort,
     coverUpdateSelection: List<Book>?,
     deleteDialogVisible: Boolean,
     deleteOriginal: Boolean,
@@ -75,6 +81,7 @@ internal fun BookshelfManageScreen(
     onBack: () -> Unit,
     onGroupSelected: (Long) -> Unit,
     onGroupManage: () -> Unit,
+    onSortChange: (BookshelfManageSort) -> Unit,
     onSelectionChange: (Book, Boolean) -> Unit,
     onOpenDetails: (Book) -> Unit,
     onReorderStarted: () -> Unit,
@@ -92,6 +99,10 @@ internal fun BookshelfManageScreen(
     onDismissExportSuccess: () -> Unit,
     onCopyExportPath: () -> Unit,
 ) {
+    val isDark = NgTheme.snapshot.isDark
+    val cardAppearance = remember(isDark) {
+        BookshelfCardAppearanceStore.read().forNight(isDark)
+    }
     val visibleUrls = remember(books) {
         books.mapTo(hashSetOf()) { it.bookUrl }
     }
@@ -103,6 +114,7 @@ internal fun BookshelfManageScreen(
         }
     }
     val listState = rememberLazyListState()
+    val sortScope = rememberCoroutineScope()
     var isReordering by remember { mutableStateOf(false) }
     val reorderState = rememberReorderableLazyListState(listState) { from, to ->
         onMove(from.index, to.index)
@@ -124,10 +136,15 @@ internal fun BookshelfManageScreen(
             query = query,
             groups = groups,
             selectedGroupId = selectedGroupId,
+            sortOrder = sortOrder,
             onQueryChange = onQueryChange,
             onBack = onBack,
             onGroupSelected = onGroupSelected,
             onGroupManage = onGroupManage,
+            onSortChange = { sort ->
+                onSortChange(sort)
+                sortScope.launch { listState.scrollToItem(0) }
+            },
         )
         LazyColumn(
             modifier = Modifier
@@ -157,11 +174,14 @@ internal fun BookshelfManageScreen(
                     val selected = book.bookUrl in selectedBookUrls
                     BookshelfManageBookCard(
                         book = book,
+                        appearance = cardAppearance,
                         selected = selected,
                         groupNames = bookGroupNames(groups, book.group),
                         cachedChapterCount = cachedChapterCounts[book.bookUrl],
                         cacheChapterTotal = cacheChapterTotals[book.bookUrl],
-                        dragHandleModifier = if (books.size > 1) {
+                        cacheBytes = cachedBytes[book.bookUrl],
+                        dragHandleEnabled = sortOrder.allowsDragging,
+                        dragHandleModifier = if (books.size > 1 && sortOrder.allowsDragging) {
                             Modifier.draggableHandle(
                                 onDragStarted = {
                                     isReordering = true
@@ -287,10 +307,14 @@ private fun BookshelfCoverExtractionDialog(
     }
 }
 
+@Composable
 private fun bookGroupNames(groups: List<BookGroup>, groupId: Long): String {
-    return groups
-        .filter { it.groupId > 0 && (it.groupId and groupId) > 0 }
-        .joinToString(",") { it.groupName }
+    val summary = remember(groups, groupId) { summarizeBookGroups(groups, groupId) }
+    return if (summary.count > 1) {
+        stringResource(R.string.bookshelf_group_count, summary.count)
+    } else {
+        summary.singleName.orEmpty()
+    }
 }
 
 @Composable

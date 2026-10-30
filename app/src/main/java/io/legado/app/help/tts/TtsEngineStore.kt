@@ -168,9 +168,9 @@ internal fun resolveFirstUseTtsRoleDefaults(
     currentMultiRoleEngineId: String?,
     currentNarratorEngineId: String?,
     currentNarratorVoiceId: String?,
-    nextEdgeAvailable: Boolean
+    translatorAvailable: Boolean
 ): TtsRoleDefaultPreferences {
-    if (!nextEdgeAvailable) {
+    if (!translatorAvailable) {
         return TtsRoleDefaultPreferences(
             multiRoleEngineId = currentMultiRoleEngineId,
             narratorEngineId = currentNarratorEngineId,
@@ -182,16 +182,16 @@ internal fun resolveFirstUseTtsRoleDefaults(
     return TtsRoleDefaultPreferences(
         multiRoleEngineId = currentMultiRoleEngineId
             ?.takeIf { it.isNotBlank() }
-            ?: TtsEngineStore.NEXT_EDGE_PROXY_ID,
+            ?: TtsEngineStore.MICROSOFT_TRANSLATOR_ID,
         narratorEngineId = if (hasNarratorSelection) {
             currentNarratorEngineId
         } else {
-            TtsEngineStore.NEXT_EDGE_PROXY_ID
+            TtsEngineStore.MICROSOFT_TRANSLATOR_ID
         },
         narratorVoiceId = if (hasNarratorSelection) {
             currentNarratorVoiceId
         } else {
-            TtsEngineStore.NEXT_EDGE_DEFAULT_VOICE_ID
+            TtsEngineStore.MICROSOFT_TRANSLATOR_DEFAULT_VOICE_ID
         }
     )
 }
@@ -202,6 +202,8 @@ object TtsEngineStore {
     const val MULTITTS_FORWARDER_ID = "multitts_forwarder"
     const val NEXT_EDGE_PROXY_ID = "next_edge_proxy"
     const val NEXT_EDGE_DEFAULT_VOICE_ID = "zh-CN-YunxiNeural"
+    const val MICROSOFT_TRANSLATOR_ID = "builtin_microsoft_translator"
+    const val MICROSOFT_TRANSLATOR_DEFAULT_VOICE_ID = "zh-CN-YunxiNeural"
     const val MIMO_V25_TTS_ID = "mimo_v25_tts"
     const val STEPAUDIO_25_TTS_ID = "stepfun_stepaudio_2_5_tts_v2_manual"
     const val MOSSLAND_TTS_ID = "mossland_moss_tts"
@@ -218,10 +220,9 @@ object TtsEngineStore {
         "http://localhost:8774/forward?volume=50&speed={{speakSpeed*2}}&text={{java.encodeURI(speakText)}}"
     private const val DEFAULT_MULTITTS_FORWARDER_URL =
         "http://localhost:8774/forward?volume={{speakVolume}}&speed={{speakSpeed}}&pitch={{speakPitch}}&voice={{voiceId}}&text={{java.encodeURI(speakText)}}"
-    private const val OLD_NEXT_EDGE_PROXY_URL = "http://36.248.181.23:22335/tts"
-    private const val DEFAULT_NEXT_EDGE_PROXY_URL = "http://5.45.99.149:8075/tts"
     private val DEFAULT_SCRIPT_ASSETS = listOf(
         "multitts_forwarder.js",
+        "microsoft_translator.js",
         "next_edge_proxy.js",
         "mimo_v25_tts.js",
         "stepaudio_25_tts.js",
@@ -328,8 +329,15 @@ object TtsEngineStore {
     }
 
     private fun resolveActiveEngine(engines: List<TtsEngineSetting>): TtsEngineSetting? {
-        val saved = appCtx.getPrefString(PreferKey.ttsEngineV2ActiveId)
-        return saved?.let { id -> engines.firstOrNull { it.id == id && it.enabled } }
+        return resolveActiveEngine(engines, appCtx.getPrefString(PreferKey.ttsEngineV2ActiveId))
+    }
+
+    internal fun resolveActiveEngine(
+        engines: List<TtsEngineSetting>,
+        savedEngineId: String?
+    ): TtsEngineSetting? {
+        return savedEngineId?.let { id -> engines.firstOrNull { it.id == id && it.enabled } }
+            ?: engines.firstOrNull { it.id == MICROSOFT_TRANSLATOR_ID && it.enabled }
             ?: engines.firstOrNull { it.enabled }
     }
 
@@ -803,6 +811,7 @@ object TtsEngineStore {
 
     private fun preferredVoiceId(engineId: String): String? {
         return when (engineId) {
+            MICROSOFT_TRANSLATOR_ID -> MICROSOFT_TRANSLATOR_DEFAULT_VOICE_ID
             NEXT_EDGE_PROXY_ID -> NEXT_EDGE_DEFAULT_VOICE_ID
             else -> null
         }
@@ -819,8 +828,8 @@ object TtsEngineStore {
             currentMultiRoleEngineId = currentMultiRoleEngineId,
             currentNarratorEngineId = currentNarratorEngineId,
             currentNarratorVoiceId = currentNarratorVoiceId,
-            nextEdgeAvailable = engines.any {
-                it.id == NEXT_EDGE_PROXY_ID && it.enabled && it.type == TtsEngineType.SCRIPT
+            translatorAvailable = engines.any {
+                it.id == MICROSOFT_TRANSLATOR_ID && it.enabled && it.type == TtsEngineType.SCRIPT
             }
         )
         if (defaults.multiRoleEngineId != currentMultiRoleEngineId) {
@@ -935,15 +944,6 @@ object TtsEngineStore {
                 builtIn.script.contains("// @version 1.3.0") &&
                 builtIn.script.contains("\"profile_source\": \"vv_clone_catalog\"")
         val savedScriptName = parseScriptMetadata(script)["name"]
-        val updatedOptionValues = if (
-            replaceScript &&
-            id == NEXT_EDGE_PROXY_ID &&
-            optionValues["api"] == OLD_NEXT_EDGE_PROXY_URL
-        ) {
-            optionValues + ("api" to DEFAULT_NEXT_EDGE_PROXY_URL)
-        } else {
-            optionValues
-        }
         return copy(
             name = if (
                 (replaceScript && name == savedScriptName) ||
@@ -957,12 +957,16 @@ object TtsEngineStore {
                 name
             },
             url = updatedUrl,
+            baseUrl = if (replaceScript && id == NEXT_EDGE_PROXY_ID) {
+                builtIn.baseUrl
+            } else {
+                baseUrl
+            },
             script = if (replaceScript) {
                 builtIn.script
             } else {
                 script
             },
-            optionValues = updatedOptionValues,
             capabilities = if (replaceScript) {
                 builtIn.capabilities
             } else {
@@ -1016,19 +1020,14 @@ object TtsEngineStore {
                 script.contains("sample_text: \"这是一段朗读试听。\"") &&
                 builtIn.script.contains(DEFAULT_TTS_PREVIEW_TEXT)
         val shouldUpdateNextEdgeProxy = id == NEXT_EDGE_PROXY_ID &&
-                (
-                        script.contains("// @version 1.0.0") ||
-                                script.contains("// @version 1.0.1") ||
-                                script.contains("// @version 1.0.2") ||
-                                script.contains("// @version 1.0.3") ||
-                                script.contains("// @version 1.0.4") ||
-                                script.contains("// @version 1.0.5") ||
-                                script.contains("// @version 1.0.6") ||
-                                script.contains("// @version 1.0.7") ||
-                                script.contains("// @version 1.0.8") ||
-                                script.contains("// @version 1.0.9")
-                        ) &&
-                builtIn.script.contains("// @version 1.0.10")
+                parseScriptMetadata(script)["version"] in setOf(
+                    "1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5",
+                    "1.0.6", "1.0.7", "1.0.8", "1.0.9", "1.0.10"
+                ) &&
+                parseScriptMetadata(builtIn.script)["version"] == "1.0.11"
+        val shouldUpdateTranslatorChineseNames = id == MICROSOFT_TRANSLATOR_ID &&
+                parseScriptMetadata(script)["version"] == "1.0.0" &&
+                parseScriptMetadata(builtIn.script)["version"] == "1.0.1"
         val shouldUpdateMimoExpressiveFields = id == MIMO_V25_TTS_ID &&
                 (script.contains("// @version 1.0.0") ||
                     script.contains("// @version 1.0.1")) &&
@@ -1103,6 +1102,7 @@ object TtsEngineStore {
         return shouldUpdateMultiTtsTemplate ||
                 shouldUpdateStaticPreviewText ||
                 shouldUpdateNextEdgeProxy ||
+                shouldUpdateTranslatorChineseNames ||
                 shouldUpdateMimoExpressiveFields ||
                 shouldUpdateMosslandClonedCatalog ||
                 shouldUpdateStepAudioPlanEndpoint ||
@@ -1519,11 +1519,8 @@ object TtsEngineStore {
     ): Boolean {
         return saved.id == NEXT_EDGE_PROXY_ID &&
             upgraded.id == NEXT_EDGE_PROXY_ID &&
-            (
-                saved.script.contains("// @version 1.0.8") ||
-                    saved.script.contains("// @version 1.0.9")
-                ) &&
-            upgraded.script.contains("// @version 1.0.10")
+            parseScriptMetadata(saved.script)["version"] in setOf("1.0.8", "1.0.9", "1.0.10") &&
+            parseScriptMetadata(upgraded.script)["version"] == "1.0.11"
     }
 
     private fun defaultScriptIds(): Set<String> {

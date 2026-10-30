@@ -8,20 +8,28 @@ import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.menuCapabilities
+import io.legado.app.help.config.BookshelfCardStyle
 import io.legado.app.ui.design.components.NgStatusTagSpec
 import io.legado.app.ui.design.components.NgStatusTagStyle
 import io.legado.app.ui.design.components.NgStatusTagVariant
 import io.legado.app.ui.design.components.compose.NgBookCover
 import io.legado.app.ui.design.components.compose.NgBookshelfManageCard
 import io.legado.app.ui.design.components.compose.NgBookshelfManageCardVariant
+import io.legado.app.utils.ConvertUtils
+
+internal fun formatBookshelfCacheSize(bytes: Long): String =
+    if (bytes == 0L) "0 B" else ConvertUtils.formatFileSize(bytes)
 
 @Composable
 internal fun BookshelfManageBookCard(
     book: Book,
+    appearance: BookshelfCardStyle,
     selected: Boolean,
     groupNames: String,
     cachedChapterCount: Int?,
     cacheChapterTotal: Int?,
+    cacheBytes: Long?,
+    dragHandleEnabled: Boolean,
     modifier: Modifier = Modifier,
     dragHandleModifier: Modifier = Modifier,
     onToggleSelected: () -> Unit,
@@ -42,10 +50,14 @@ internal fun BookshelfManageBookCard(
         metadataText = sourceName,
         modifier = modifier,
         variant = NgBookshelfManageCardVariant.COVER_CARD,
-        cacheText = if (book.isLocal || !book.menuCapabilities.showCache) {
-            null
-        } else {
-            "$cachedCountText/${cacheChapterTotal ?: book.totalChapterNum}"
+        appearance = appearance,
+        cacheText = when {
+            !book.menuCapabilities.showCache -> null
+            book.isLocal -> cacheBytes?.let(::formatBookshelfCacheSize)
+            else -> listOfNotNull(
+                "$cachedCountText/${cacheChapterTotal ?: book.totalChapterNum}",
+                cacheBytes?.let(::formatBookshelfCacheSize),
+            ).joinToString(" · ")
         },
         groupTag = NgStatusTagSpec(
             text = groupNames.ifBlank { stringResource(R.string.no_group) },
@@ -73,6 +85,7 @@ internal fun BookshelfManageBookCard(
         },
         dragHandleContentDescription = stringResource(R.string.bookshelf_px_3),
         dragHandleModifier = dragHandleModifier,
+        dragHandleEnabled = dragHandleEnabled,
         onClick = onToggleSelected,
         onLongClick = onOpenDetails
     )

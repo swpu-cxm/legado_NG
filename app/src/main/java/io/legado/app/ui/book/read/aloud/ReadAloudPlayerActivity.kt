@@ -1,12 +1,18 @@
 package io.legado.app.ui.book.read.aloud
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.graphics.Point
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.IntRect
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
@@ -30,6 +36,7 @@ import io.legado.app.help.tts.shouldProjectReadAloudSubtitle
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.service.BaseReadAloudService
+import io.legado.app.ui.book.bgm.BgmListeningDialog
 import io.legado.app.ui.book.character.BookCharacterActivity
 import io.legado.app.ui.book.character.BookCharacterTtsActivity
 import io.legado.app.ui.book.character.BookStoryboardActivity
@@ -57,6 +64,9 @@ class ReadAloudPlayerActivity : BaseActivity<ComposeActivityBinding>(
     override val binding by viewBinding(ComposeActivityBinding::inflate)
 
     private var uiState by mutableStateOf(ReadAloudPlayerUiState())
+    private var windowEnvironment by mutableStateOf(ListeningWindowEnvironment())
+    private var paneLayout by mutableStateOf<ListeningPaneLayout?>(null)
+    private var paneDialogHost: ReadAloudPaneDialogHost? = null
     private var playerThemeSnapshot by mutableStateOf<NgThemeSnapshot?>(null)
     private var playerThemeJob: Job? = null
     private var playerThemeKey: String? = null
@@ -87,6 +97,8 @@ class ReadAloudPlayerActivity : BaseActivity<ComposeActivityBinding>(
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        refreshListeningWindowEnvironment()
+        paneDialogHost = ReadAloudPaneDialogHost(supportFragmentManager, ::listeningPaneBounds)
         refreshListeningTheme(force = true)
         initContent()
         refreshStaticState()
@@ -109,10 +121,43 @@ class ReadAloudPlayerActivity : BaseActivity<ComposeActivityBinding>(
 
     override fun onResume() {
         super.onResume()
+        refreshListeningWindowEnvironment()
         ReadAloudMiniPlayer.detach(this)
         refreshStaticState()
         refreshVoiceLabelIfDirty()
         refreshPreparationState()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        refreshListeningWindowEnvironment()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode)
+        refreshListeningWindowEnvironment(isInMultiWindowMode)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun refreshListeningWindowEnvironment(
+        multiWindow: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode,
+    ) {
+        val maximumSize = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            windowManager.maximumWindowMetrics.bounds.let { Point(it.width(), it.height()) }
+        } else Point().also { windowManager.defaultDisplay.getRealSize(it) }
+        val environment = ListeningWindowEnvironment(
+            largeDisplay = isLargeListeningDisplay(
+                maximumSize.x, maximumSize.y, resources.configuration.densityDpi,
+            ),
+            multiWindow = multiWindow,
+        )
+        windowEnvironment = environment
+        val orientation = if (shouldLockListeningPortrait(environment)) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        if (requestedOrientation != orientation) requestedOrientation = orientation
     }
 
     private fun initContent() {
@@ -123,10 +168,21 @@ class ReadAloudPlayerActivity : BaseActivity<ComposeActivityBinding>(
             NgAppTheme(snapshot = playerThemeSnapshot) {
                 ReadAloudPlayerScreen(
                     state = uiState,
+                    windowEnvironment = windowEnvironment,
+                    onPaneLayoutChanged = ::updatePaneLayout,
                     onAction = ::handleAction,
                 )
             }
         }
+    }
+
+    internal fun listeningPaneBounds(music: Boolean): IntRect? =
+        paneLayout?.let { if (music) it.music else it.controls }
+
+    private fun updatePaneLayout(layout: ListeningPaneLayout?) {
+        if (paneLayout == layout) return
+        paneLayout = layout
+        paneDialogHost?.refresh()
     }
 
     private fun refreshListeningTheme(
@@ -158,6 +214,7 @@ class ReadAloudPlayerActivity : BaseActivity<ComposeActivityBinding>(
     private fun handleAction(action: ReadAloudPlayerAction) {
         when (action) {
             ReadAloudPlayerAction.Close -> finish()
+            ReadAloudPlayerAction.BackgroundMusic -> showDrawer("bgmListening", ::BgmListeningDialog)
             ReadAloudPlayerAction.OpenBookInfo -> openBookInfo()
             ReadAloudPlayerAction.Timer -> {
                 showDrawer("readAloudTimer", ::ReadAloudTimerDialog)
@@ -950,7 +1007,16 @@ class ReadAloudPlayerActivity : BaseActivity<ComposeActivityBinding>(
         )
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) {
+            io.legado.app.help.bgm.BgmPlaybackController.releaseForegroundPlayback()
+        }
+    }
+
     override fun onDestroy() {
+        paneDialogHost?.dispose()
+        paneDialogHost = null
         playerThemeJob?.cancel()
         voiceLabelJob?.cancel()
         clearPendingBufferProgress()
