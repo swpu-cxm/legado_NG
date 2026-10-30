@@ -164,6 +164,8 @@ open class WebDav(
     }
 
     /**
+     * @param propsList 指定列出文件的哪些属性
+     */
     @Throws(WebDavException::class)
     private suspend fun propFindResponse(
         propsList: List<String> = emptyList(),

@@ -19,7 +19,7 @@ import java.util.ArrayDeque
 
 private const val REMOTE_SEARCH_PARALLELISM = 3
 
-internal class RemoteBookSearchProgress(
+class RemoteBookSearchProgress(
     val scannedDirs: Int,
     val matched: Int,
     val pendingDirs: Int,
