@@ -71,6 +71,9 @@ android {
 
         buildConfigField "String", "Cronet_Version", "\"$CronetVersion\""
         buildConfigField "String", "Cronet_Main_Version", "\"$CronetMainVersion\""
+        buildConfigField "String", "UPDATE_REPO_OWNER", "\"joestar817\""
+        buildConfigField "String", "UPDATE_REPO_NAME", "\"legado_NG\""
+        buildConfigField "boolean", "GXJ_PRIVATE_UPDATE", "false"
 
         javaCompileOptions {
             annotationProcessorOptions {
@@ -123,6 +126,9 @@ android {
         gxj {
             dimension "mode"
             manifestPlaceholders.put("APP_CHANNEL_VALUE", "gxj")
+            buildConfigField "String", "UPDATE_REPO_OWNER", "\"swpu-cxm\""
+            buildConfigField "String", "UPDATE_REPO_NAME", "\"legado_NG\""
+            buildConfigField "boolean", "GXJ_PRIVATE_UPDATE", "true"
         }
     }
 

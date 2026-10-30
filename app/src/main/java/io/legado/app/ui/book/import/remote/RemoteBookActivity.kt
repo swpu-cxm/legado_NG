@@ -56,6 +56,7 @@ class RemoteBookActivity :
     private var selectedItems by mutableStateOf<Set<RemoteBook>>(emptySet())
     private var query by mutableStateOf("")
     private var searchExpanded by mutableStateOf(false)
+    private var webDavRecursiveSearch by mutableStateOf(AppConfig.webDavRecursiveSearch)
     private var pathText by mutableStateOf("/")
     private var isAtRoot by mutableStateOf(true)
     private var isLoading by mutableStateOf(false)
@@ -119,6 +120,8 @@ class RemoteBookActivity :
                         if (expanded) searchExpanded = true else closeSearch()
                     },
                     onQueryChange = ::updateQuery,
+                    webDavRecursiveSearch = webDavRecursiveSearch,
+                    onWebDavRecursiveSearchChange = ::onWebDavRecursiveSearchChange,
                     onRefresh = ::upPath,
                     onGoUp = { goBackDir() },
                     onSortChange = ::changeSort,
@@ -160,7 +163,25 @@ class RemoteBookActivity :
 
     private fun updateQuery(value: String) {
         query = value
-        viewModel.updateCallBackFlow(value)
+        if (value.isBlank()) {
+            upPath()
+            return
+        }
+        if (AppConfig.webDavRecursiveSearch) {
+            viewModel.searchRemoteBooksRecursive(value) { isLoading = it }
+        } else {
+            viewModel.updateCallBackFlow(value)
+        }
+    }
+
+    private fun onWebDavRecursiveSearchChange(enabled: Boolean) {
+        webDavRecursiveSearch = enabled
+        AppConfig.webDavRecursiveSearch = enabled
+        if (query.isNotBlank()) {
+            updateQuery(query)
+        } else if (!enabled) {
+            upPath()
+        }
     }
 
     private fun closeSearch() {

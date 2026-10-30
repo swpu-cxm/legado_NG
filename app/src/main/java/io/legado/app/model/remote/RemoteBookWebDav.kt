@@ -49,6 +49,29 @@ class RemoteBookWebDav(
         return remoteBooks
     }
 
+    suspend fun collectRemoteBooksRecursively(
+        rootPath: String,
+        namePredicate: (String) -> Boolean,
+    ): MutableList<RemoteBook> {
+        val result = mutableListOf<RemoteBook>()
+        walkRemoteBooks(rootPath, namePredicate, result)
+        return result
+    }
+
+    private suspend fun walkRemoteBooks(
+        path: String,
+        namePredicate: (String) -> Boolean,
+        result: MutableList<RemoteBook>,
+    ) {
+        getRemoteBookList(path).forEach { remoteBook ->
+            if (remoteBook.isDir) {
+                walkRemoteBooks(remoteBook.path, namePredicate, result)
+            } else if (namePredicate(remoteBook.filename)) {
+                result.add(remoteBook)
+            }
+        }
+    }
+
     override suspend fun getRemoteBook(path: String): RemoteBook? {
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络不可用")
         val webDavFile = WebDav(path, authorization).getWebDavFile()

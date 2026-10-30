@@ -74,6 +74,19 @@ class AppUpdateReleaseTest {
     }
 
     @Test
+    fun `gxj release tag parser accepts version tag`() {
+        assertEquals(
+            "3.26.103022",
+            AppVersion.parseGxjReleaseTag("v3.26.103022")?.value,
+        )
+    }
+
+    @Test
+    fun `gxj signed asset name is recognized`() {
+        assertTrue(AppVersion.isGxjSignedAssetName("legado_NG_gxj_3.26.103022-signed.apk"))
+    }
+
+    @Test
     fun `relay candidates keep github as final fallback`() {
         val apiUrl = "https://api.github.com/repos/joestar817/legado_NG/releases/latest"
 

@@ -1956,6 +1956,8 @@
     <string name="variable_comment">变量说明(variableComment)</string>
     <string name="variable_value">变量</string>
     <string name="remote_book">远程书籍</string>
+    <string name="web_dav_recursive_search">搜索子目录</string>
+    <string name="web_dav_recursive_search_summary">在当前目录及所有子文件夹中搜索书名（书多时较慢，默认关闭）</string>
     <string name="reading_time_sort">阅读时长排序</string>
     <string name="last_read_time_sort">阅读时间排序</string>
     <string name="reading_time_tag">阅读时长:</string>

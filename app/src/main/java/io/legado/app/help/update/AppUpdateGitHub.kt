@@ -1,6 +1,7 @@
 package io.legado.app.help.update
 
 import androidx.annotation.Keep
+import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
@@ -22,18 +23,25 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
     private const val API_ATTEMPT_TIMEOUT = 4_500L
 
     private val checkVariant: AppVariant
-        get() = when (AppConfig.updateToVariant) {
-            "official_version" -> AppVariant.OFFICIAL
-            "beta_release_version" -> AppVariant.BETA_RELEASE
+        get() = when {
+            BuildConfig.GXJ_PRIVATE_UPDATE -> AppVariant.GXJ_PRIVATE
+            AppConfig.updateToVariant == "official_version" -> AppVariant.OFFICIAL
+            AppConfig.updateToVariant == "beta_release_version" -> AppVariant.BETA_RELEASE
             else -> AppConst.appInfo.appVariant
         }
 
-    private suspend fun getLatestRelease(): List<AppReleaseInfo> {
-        val gitHubUrl = if (checkVariant.isBeta()) {
-            "https://api.github.com/repos/joestar817/legado_NG/releases/tags/beta"
+    private fun releaseApiUrl(): String {
+        val owner = BuildConfig.UPDATE_REPO_OWNER
+        val repo = BuildConfig.UPDATE_REPO_NAME
+        return if (checkVariant == AppVariant.BETA_RELEASE && !BuildConfig.GXJ_PRIVATE_UPDATE) {
+            "https://api.github.com/repos/$owner/$repo/releases/tags/beta"
         } else {
-            "https://api.github.com/repos/joestar817/legado_NG/releases/latest"
+            "https://api.github.com/repos/$owner/$repo/releases/latest"
         }
+    }
+
+    private suspend fun getLatestRelease(): List<AppReleaseInfo> {
+        val gitHubUrl = releaseApiUrl()
         var lastError: Throwable? = null
         for (releaseUrl in AppUpdateRelay.apiCandidates(gitHubUrl)) {
             try {

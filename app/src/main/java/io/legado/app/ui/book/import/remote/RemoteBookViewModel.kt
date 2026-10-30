@@ -58,7 +58,7 @@ class RemoteBookViewModel(application: Application) : BaseViewModel(application)
                     trySend(list)
                 } else {
                     trySend(
-                        list.filter { it.filename.contains(key) }
+                        list.filter { it.filename.contains(key, ignoreCase = true) }
                     )
                 }
             }
@@ -124,6 +124,26 @@ class RemoteBookViewModel(application: Application) : BaseViewModel(application)
         }.onError {
             AppLog.put("获取webDav书籍出错\n${it.localizedMessage}", it)
             context.toastOnUi("获取webDav书籍出错\n${it.localizedMessage}")
+        }.onStart {
+            loadCallback.invoke(true)
+        }.onFinally {
+            loadCallback.invoke(false)
+        }.start()
+    }
+
+    fun searchRemoteBooksRecursive(filterKey: String, loadCallback: (loading: Boolean) -> Unit) {
+        executeLazy {
+            val bookWebDav = remoteBookWebDav
+                ?: throw NoStackTraceException("没有配置webDav")
+            val basePath = dirList.lastOrNull()?.path ?: bookWebDav.rootBookUrl
+            dataCallback?.clear()
+            val bookList = bookWebDav.collectRemoteBooksRecursively(basePath) { fileName ->
+                fileName.contains(filterKey, ignoreCase = true)
+            }
+            dataCallback?.setItems(bookList)
+        }.onError {
+            AppLog.put("搜索远程书籍出错\n${it.localizedMessage}", it)
+            context.toastOnUi("搜索远程书籍出错\n${it.localizedMessage}")
         }.onStart {
             loadCallback.invoke(true)
         }.onFinally {

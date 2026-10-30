@@ -54,7 +54,10 @@ object AppConst {
         appCtx.packageManager.getPackageInfo(appCtx.packageName, PackageManager.GET_ACTIVITIES)
             ?.let {
                 appInfo.versionName = it.versionName!!
-                appInfo.appVariant = AppVariant.fromUpdateChannel(BuildConfig.UPDATE_CHANNEL)
+                appInfo.appVariant = when {
+                    BuildConfig.GXJ_PRIVATE_UPDATE -> AppVariant.GXJ_PRIVATE
+                    else -> AppVariant.fromUpdateChannel(BuildConfig.UPDATE_CHANNEL)
+                }
 
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                     appInfo.versionCode = it.longVersionCode

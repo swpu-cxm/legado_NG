@@ -1,5 +1,6 @@
 package io.legado.app.help.update
 
+import io.legado.app.BuildConfig
 import java.io.InputStream
 import java.net.URI
 import java.net.URLEncoder
@@ -10,8 +11,11 @@ internal object AppUpdateRelay {
     private const val API_RELAY_PREFIX = "https://gh-proxy.com/"
     private const val DOWNLOAD_RELAY_PREFIX = "https://gh-proxy.com/"
     private const val STREAM_DOWNLOAD_URL = "https://download.githubcdn.com?url="
-    private const val RELEASE_OWNER = "joestar817"
-    private const val RELEASE_REPOSITORY = "legado_NG"
+
+    private val releaseOwner: String
+        get() = BuildConfig.UPDATE_REPO_OWNER
+    private val releaseRepository: String
+        get() = BuildConfig.UPDATE_REPO_NAME
 
     fun apiCandidates(gitHubUrl: String): List<String> {
         require(isAllowedGitHubApiUrl(gitHubUrl)) { "不支持的 GitHub 更新接口" }
@@ -34,8 +38,8 @@ internal object AppUpdateRelay {
         if (uri.rawQuery != null || uri.rawFragment != null || uri.userInfo != null) return false
         val pathSegments = uri.path.split('/').filter(String::isNotEmpty)
         return pathSegments.size == 6 &&
-            pathSegments[0] == RELEASE_OWNER &&
-            pathSegments[1] == RELEASE_REPOSITORY &&
+            pathSegments[0] == releaseOwner &&
+            pathSegments[1] == releaseRepository &&
             pathSegments[2] == "releases" &&
             pathSegments[3] == "download" &&
             pathSegments[4].isNotBlank() &&
@@ -46,8 +50,12 @@ internal object AppUpdateRelay {
         val uri = url.toUriOrNull() ?: return false
         if (uri.scheme != "https" || uri.host != "api.github.com" || uri.port != -1) return false
         if (uri.rawQuery != null || uri.rawFragment != null || uri.userInfo != null) return false
-        return uri.path == "/repos/$RELEASE_OWNER/$RELEASE_REPOSITORY/releases/latest" ||
-            uri.path == "/repos/$RELEASE_OWNER/$RELEASE_REPOSITORY/releases/tags/beta"
+        val latestPath = "/repos/$releaseOwner/$releaseRepository/releases/latest"
+        if (BuildConfig.GXJ_PRIVATE_UPDATE) {
+            return uri.path == latestPath
+        }
+        return uri.path == latestPath ||
+            uri.path == "/repos/$releaseOwner/$releaseRepository/releases/tags/beta"
     }
 
     private fun String.toUriOrNull(): URI? = runCatching { URI(this) }.getOrNull()

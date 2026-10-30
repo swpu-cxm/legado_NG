@@ -2,6 +2,7 @@ package io.legado.app.help.update
 
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
+import io.legado.app.BuildConfig
 import io.legado.app.exception.NoStackTraceException
 import java.time.Instant
 
@@ -22,6 +23,7 @@ data class AppReleaseInfo(
 enum class AppVariant {
     OFFICIAL,
     BETA_RELEASE,
+    GXJ_PRIVATE,
     UNKNOWN;
 
     fun isBeta(): Boolean {
@@ -51,6 +53,9 @@ data class GithubRelease(
     val tagName: String,
 ) {
     fun gitReleaseToAppReleaseInfo(): List<AppReleaseInfo> {
+        if (BuildConfig.GXJ_PRIVATE_UPDATE) {
+            return gitReleaseToGxjPrivateReleaseInfo()
+        }
         assets ?: throw NoStackTraceException("获取新版本出错")
         val appVariant = if (isPreRelease) AppVariant.BETA_RELEASE else AppVariant.OFFICIAL
         val tagVersion = if (appVariant == AppVariant.OFFICIAL) {
@@ -67,6 +72,25 @@ data class GithubRelease(
                 asset.assetToAppReleaseInfo(
                     appVariant = appVariant,
                     version = tagVersion ?: assetVersion,
+                    note = body.orEmpty(),
+                )
+            }
+        if (releases.isEmpty()) {
+            throw NoStackTraceException("没有可用的更新安装包")
+        }
+        return releases
+    }
+
+    private fun gitReleaseToGxjPrivateReleaseInfo(): List<AppReleaseInfo> {
+        assets ?: throw NoStackTraceException("获取新版本出错")
+        val tagVersion = AppVersion.parseGxjReleaseTag(tagName)
+            ?: throw NoStackTraceException("Release 标签版本无法识别: $tagName")
+        val releases = assets
+            .filter { it.isValidGxjPrivate }
+            .map { asset ->
+                asset.assetToAppReleaseInfo(
+                    appVariant = AppVariant.GXJ_PRIVATE,
+                    version = tagVersion,
                     note = body.orEmpty(),
                 )
             }
@@ -111,6 +135,14 @@ data class Asset(
             state == "uploaded" &&
             size > 0L &&
             sha256 != null &&
+            AppUpdateRelay.isAllowedReleaseDownloadUrl(apkUrl, name)
+
+    val isValidGxjPrivate: Boolean
+        get() = contentType == "application/vnd.android.package-archive" &&
+            state == "uploaded" &&
+            size > 0L &&
+            sha256 != null &&
+            AppVersion.isGxjSignedAssetName(name) &&
             AppUpdateRelay.isAllowedReleaseDownloadUrl(apkUrl, name)
 
     internal fun assetToAppReleaseInfo(

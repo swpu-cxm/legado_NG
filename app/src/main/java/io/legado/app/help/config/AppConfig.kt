@@ -614,6 +614,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefLong(PreferKey.remoteServerId, value)
         }
 
+    /** 远程 WebDAV 书架：搜索时遍历当前目录下所有子文件夹（默认关闭） */
+    var webDavRecursiveSearch: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.webDavRecursiveSearch, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.webDavRecursiveSearch, value)
+        }
+
     // 添加本地选择的目录
     var importBookPath: String?
         get() = appCtx.getPrefString("importBookPath")

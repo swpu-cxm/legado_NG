@@ -15,6 +15,18 @@ internal data class AppVersion(
         private val versionRegex = Regex("^(\\d+)\\.(\\d{2})\\.(\\d{6})(?:-?debug)?$")
         private val assetNameRegex =
             Regex("^legado_NG_(\\d+\\.\\d{2}\\.\\d{6})\\d{2}_(release|beta)\\.apk$")
+        private val gxjSignedAssetRegex =
+            Regex("^legado_NG_gxj_.+-signed\\.apk$", RegexOption.IGNORE_CASE)
+        private val gxjTagVersionPrefixRegex = Regex("^(\\d+\\.\\d{2}\\.\\d{6})")
+
+        fun isGxjSignedAssetName(name: String): Boolean = gxjSignedAssetRegex.matches(name)
+
+        fun parseGxjReleaseTag(tag: String): AppVersion? {
+            val trimmed = tag.removePrefix("v")
+            parse(trimmed)?.let { return it }
+            val prefix = gxjTagVersionPrefixRegex.find(trimmed)?.groupValues?.get(1)
+            return prefix?.let { parse(it) }
+        }
 
         fun parse(value: String): AppVersion? {
             val match = versionRegex.matchEntire(value.trim()) ?: return null
@@ -31,7 +43,7 @@ internal data class AppVersion(
             val expectedSuffix = when (variant) {
                 AppVariant.OFFICIAL -> "release"
                 AppVariant.BETA_RELEASE -> "beta"
-                AppVariant.UNKNOWN -> return null
+                AppVariant.GXJ_PRIVATE, AppVariant.UNKNOWN -> return null
             }
             if (match.groupValues[2] != expectedSuffix) return null
             return parse(match.groupValues[1])

@@ -26,7 +26,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -81,6 +82,8 @@ internal fun RemoteBookScreen(
     onBack: () -> Unit,
     onSearchExpandedChange: (Boolean) -> Unit,
     onQueryChange: (String) -> Unit,
+    webDavRecursiveSearch: Boolean,
+    onWebDavRecursiveSearchChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onGoUp: () -> Unit,
     onSortChange: (RemoteBookSort) -> Unit,
@@ -101,6 +104,8 @@ internal fun RemoteBookScreen(
             onBack = onBack,
             onSearchExpandedChange = onSearchExpandedChange,
             onQueryChange = onQueryChange,
+            webDavRecursiveSearch = webDavRecursiveSearch,
+            onWebDavRecursiveSearchChange = onWebDavRecursiveSearchChange,
             onMenuAction = onMenuAction,
         )
         RemoteBookDirectoryPanel(
@@ -136,6 +141,8 @@ private fun RemoteBookTopBar(
     onBack: () -> Unit,
     onSearchExpandedChange: (Boolean) -> Unit,
     onQueryChange: (String) -> Unit,
+    webDavRecursiveSearch: Boolean,
+    onWebDavRecursiveSearchChange: (Boolean) -> Unit,
     onMenuAction: (Int) -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -171,16 +178,40 @@ private fun RemoteBookTopBar(
                     )
                 }
                 if (searchExpanded) {
-                    NgSearchBar(
-                        query = query,
-                        onQueryChange = onQueryChange,
-                        hint = stringResource(R.string.screen) + " · " +
-                            stringResource(R.string.remote_book),
-                        modifier = Modifier.weight(1f),
-                        variant = NgSearchBarVariant.TOOLBAR,
-                        containerColor = Color.Transparent,
-                        hideHintOnFocus = false,
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        NgSearchBar(
+                            query = query,
+                            onQueryChange = onQueryChange,
+                            hint = stringResource(R.string.screen) + " · " +
+                                stringResource(R.string.remote_book),
+                            modifier = Modifier.fillMaxWidth(),
+                            variant = NgSearchBarVariant.TOOLBAR,
+                            containerColor = Color.Transparent,
+                            hideHintOnFocus = false,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.web_dav_recursive_search),
+                                modifier = Modifier.weight(1f),
+                                color = Color(NgTheme.colors.onSurfaceVariant),
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                            )
+                            Switch(
+                                checked = webDavRecursiveSearch,
+                                onCheckedChange = onWebDavRecursiveSearchChange,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color(NgTheme.colors.primary),
+                                    checkedTrackColor = Color(NgTheme.colors.primary).copy(alpha = 0.35f),
+                                ),
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { onSearchExpandedChange(false) },
                         modifier = Modifier.size(40.dp),

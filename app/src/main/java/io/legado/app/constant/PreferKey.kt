@@ -37,6 +37,8 @@ object PreferKey {
     const val coverShowNameN = "coverShowNameN"
     const val coverShowAuthorN = "coverShowAuthorN"
     const val remoteServerId = "remoteServerId"
+    /** 远程 WebDAV 书架搜索是否包含子目录（默认关） */
+    const val webDavRecursiveSearch = "webDavRecursiveSearch"
     const val hideStatusBar = "hideStatusBar"
     const val clickActionTL = "clickActionTopLeft"
     const val clickActionTC = "clickActionTopCenter"

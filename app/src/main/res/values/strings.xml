@@ -1962,6 +1962,8 @@
     <string name="variable_comment">变量说明(variableComment)</string>
     <string name="variable_value">Variable</string>
     <string name="remote_book">Remote book</string>
+    <string name="web_dav_recursive_search">Search subfolders</string>
+    <string name="web_dav_recursive_search_summary">Search all files under the current folder (slower; off by default)</string>
     <string name="reading_time_sort">Sort by reading duration</string>
     <string name="last_read_time_sort">Sort by read time</string>
     <string name="reading_time_tag">Reading time:</string>
