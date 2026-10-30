@@ -414,6 +414,7 @@
         <activity
             android:name=".ui.association.FileAssociationActivity"
             android:exported="true"
+            android:label="@string/receiving_file_share_label"
             android:launchMode="singleTop"
             android:theme="@style/AppTheme.Transparent">
             <!-- VIEW (Open with) action -->
@@ -509,6 +510,36 @@
                 <data android:pathAdvancedPattern=".*\\.7[zZ]" />
                 <data android:pathPattern=".*\\.7z" />
                 <data android:pathPattern=".*\\.7Z" />
+            </intent-filter>
+            <!-- Share sheet (ACTION_SEND) for known media types -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/javascript" />
+                <data android:mimeType="application/x-javascript" />
+                <data android:mimeType="application/ecmascript" />
+                <data android:mimeType="text/javascript" />
+                <data android:mimeType="text/x-javascript" />
+                <data android:mimeType="text/ecmascript" />
+                <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/mobi" />
+                <data android:mimeType="application/x-mobipocket-ebook" />
+                <data android:mimeType="application/azw" />
+                <data android:mimeType="application/azw3" />
+                <data android:mimeType="application/x-mobi8-ebook" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
 

@@ -122,23 +122,29 @@ class FileAssociationActivity :
                 }
             }
         }
-        intent.data?.let { data ->
-            if (data.isContentScheme() && data.canRead()) {
-                viewModel.dispatchIntent(data)
-            } else {
-                PermissionsCompat.Builder()
-                    .addPermissions(*Permissions.Group.STORAGE)
-                    .rationale(R.string.tip_perm_request_storage)
-                    .onGranted {
-                        viewModel.dispatchIntent(data)
-                    }.onDenied {
-                        toastOnUi("请求存储权限失败。")
-                        handler.postDelayed(2000) {
-                            finish()
-                        }
-                    }.request()
-            }
-        } ?: finish()
+        val data = intent.associationUri() ?: run {
+            finish()
+            return
+        }
+        dispatchAssociationUri(data)
+    }
+
+    private fun dispatchAssociationUri(data: Uri) {
+        if (data.isContentScheme() && data.canRead()) {
+            viewModel.dispatchIntent(data)
+        } else {
+            PermissionsCompat.Builder()
+                .addPermissions(*Permissions.Group.STORAGE)
+                .rationale(R.string.tip_perm_request_storage)
+                .onGranted {
+                    viewModel.dispatchIntent(data)
+                }.onDenied {
+                    toastOnUi("请求存储权限失败。")
+                    handler.postDelayed(2000) {
+                        finish()
+                    }
+                }.request()
+        }
     }
 
     private fun importBook(uri: Uri) {

@@ -5,6 +5,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import io.legado.app.ui.association.FileAssociationActivity
+import io.legado.app.ui.association.associationUri
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.utils.startActivity
@@ -24,6 +26,14 @@ class SharedReceiverActivity : AppCompatActivity() {
     private fun initIntent() {
         when {
             intent.action == Intent.ACTION_SEND && intent.type == receivingType -> {
+                intent.associationUri()?.let { uri ->
+                    startActivity<FileAssociationActivity> {
+                        action = Intent.ACTION_VIEW
+                        data = uri
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    return
+                }
                 intent.getStringExtra(Intent.EXTRA_TEXT)?.let {
                     dispose(it)
                 }
