@@ -63,7 +63,15 @@
     <string name="book_other_works">其它作品</string>
     <string name="book_info_play">播放</string>
     <string name="auto_load_book_other_works">加载相关</string>
-    <string name="book_info_menu_book_management">书籍管理</string>
+    <string name="book_info_settings">书籍设置</string>
+    <string name="book_info_settings_book">本书设置</string>
+    <string name="book_info_settings_general">详情页通用</string>
+    <string name="book_info_settings_variables">变量设置</string>
+    <string name="book_info_settings_source_shared">同书源共用</string>
+    <string name="book_info_delete_confirmation">删除前确认</string>
+    <string name="book_info_auto_load_related">自动加载其他作品</string>
+    <string name="ng_form_row_expanded">已展开</string>
+    <string name="ng_form_row_collapsed">已折叠</string>
     <string name="book_info_menu_source_and_links">书源与链接</string>
     <string name="book_info_menu_data_and_diagnostics">数据与诊断</string>
     <string name="book_other_works_idle">点击右侧刷新，查找该作者的其它作品。</string>
@@ -82,6 +90,7 @@
     <string name="character_avatar_uri">头像 URI</string>
     <string name="character_portrait_uri">人物立绘 URI</string>
     <string name="character_image_prompt">生图提示词</string>
+    <string name="character_image_prompt_hint">用于 AI 生图，可留空</string>
     <string name="character_gender_male">男</string>
     <string name="character_gender_female">女</string>
     <string name="character_gender_unknown">未知</string>
@@ -671,6 +680,13 @@
     <string name="ai_balance_json_path">余额 JSON 路径</string>
     <string name="ai_balance_json_path_summary">例如：data.total_credits</string>
     <string name="ai_provider_saved">提供商已保存</string>
+    <string name="ai_model_restore_capabilities">按模型名重新识别</string>
+    <string name="ai_model_restore_capabilities_message">将覆盖当前的模型类型、输入输出和能力设置，保存后生效。</string>
+    <string name="ai_provider_reset">重置设置</string>
+    <string name="ai_provider_reset_message">将恢复默认名称和接口配置（Base URL、路径、超时、自定义接口地址）；保留 API Key、启用状态和已获取的模型。手动命名的自定义提供商名称会保留。</string>
+    <string name="ai_provider_reset_done">提供商设置已重置</string>
+    <string name="ai_provider_no_api_key">未配置 Key</string>
+    <string name="ai_provider_models_not_fetched">未获取模型</string>
     <string name="ai_active_provider">当前使用</string>
     <string name="ai_api_key_required">请先填写 API Key</string>
     <string name="ai_model_reasoning_only">仅返回推理内容：%s</string>
@@ -745,6 +761,8 @@
     <string name="pt_hide_status_bar">隐藏状态栏</string>
     <string name="ps_hide_status_bar">阅读界面隐藏状态栏</string>
     <string name="read_aloud">朗读</string>
+    <string name="create_character_card">创建角色卡</string>
+    <string name="view_character_card">查看角色卡</string>
     <string name="book_info_listen">听书</string>
     <string name="read_aloud_t">正在朗读</string>
     <string name="read_aloud_s">点击打开阅读界面</string>

@@ -46,6 +46,7 @@ import io.legado.app.help.ai.AiSkillDefinition
 import io.legado.app.help.ai.AiSkillExistsException
 import io.legado.app.help.ai.AiSkillRegistry
 import io.legado.app.help.ai.AiSkillScope
+import io.legado.app.help.ai.aiProviderHost
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.design.components.NgStatusTagSpec
@@ -321,6 +322,15 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         }
     }
 
+    internal fun usesFloatingSettingsTitleBar(): Boolean = when (currentPage) {
+        Page.MAIN,
+        Page.PURIFY_MODEL_SETTINGS,
+        Page.READ_ALOUD_MODEL_SETTINGS,
+        Page.ASSISTANT_MODEL_SETTINGS,
+        Page.PURIFY_SETTINGS -> true
+        else -> false
+    }
+
     private fun setPageTitle(title: CharSequence) {
         clearPageActions()
         activity?.title = title
@@ -328,6 +338,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             titleBar.isVisible = true
             titleBar.title = title
         }
+        (activity as? ConfigActivity)?.refreshTitleBarChrome(this)
     }
 
     private fun setPageTitle(resId: Int) {
@@ -721,15 +732,21 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             query = providerSearchQuery,
             listState = NgListState.Content(
                 providers.map { provider ->
+                    val modelCount = provider.visibleModelCount()
+                    val providerHost = aiProviderHost(provider.baseUrl)
                     AiProviderListItemUiModel(
                         id = provider.id,
                         name = provider.name,
+                        summary = providerHost.takeIf { it != provider.name }.orEmpty(),
                         iconRes = provider.iconRes(),
                         enabled = provider.enabled,
-                        modelCountText = getString(
-                            R.string.ai_model_list_count,
-                            provider.visibleModelCount().toString()
-                        ),
+                        modelCountText = if (modelCount == 0) {
+                            getString(R.string.ai_provider_models_not_fetched)
+                        } else {
+                            getString(R.string.ai_model_list_count, modelCount.toString())
+                        },
+                        modelCountWarning = modelCount == 0,
+                        keyConfigured = provider.apiKey.isNotBlank(),
                         reorderable = true,
                         deletable = !provider.builtIn
                     )
@@ -841,12 +858,17 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         if (currentPage != Page.DETAIL) return
         when (action) {
             is AiProviderFormScreenAction.FieldChanged -> {
+                if (action.field == AiProviderFormField.BASE_URL) {
+                    providerFormScreenState =
+                        providerFormScreenState.withAutoNameForBaseUrl(action.value)
+                }
                 providerFormScreenState = providerFormScreenState.withField(
                     action.field,
                     action.value
                 )
                 val provider = saveCurrentProvider(
-                    updateHeader = action.field == AiProviderFormField.NAME
+                    updateHeader = action.field == AiProviderFormField.NAME ||
+                        action.field == AiProviderFormField.BASE_URL
                 )
                 if (action.field == AiProviderFormField.API_KEY && provider != null) {
                     refreshModelList(provider)
@@ -863,6 +885,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
 
             AiProviderFormScreenAction.TestConnectionRequested -> testConnection()
             AiProviderFormScreenAction.QueryBalanceRequested -> queryBalance()
+            AiProviderFormScreenAction.ResetRequested -> confirmResetCurrentProvider()
             AiProviderFormScreenAction.DeleteRequested -> confirmDeleteCurrentProvider()
         }
     }
@@ -2602,6 +2625,28 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                 waitDialog.dismiss()
             }
         }
+    }
+
+    private fun confirmResetCurrentProvider() {
+        val provider = currentProviderId?.let { AiProviderStore.provider(it) } ?: return
+        showAiClassicDialog(
+            title = getString(R.string.ai_provider_reset),
+            message = getString(R.string.ai_provider_reset_message),
+            cancelText = getString(android.R.string.cancel),
+            dismissBeforeConfirm = true,
+            onConfirm = {
+                if (AiProviderStore.resetProvider(provider.id) != null) {
+                    Toast.makeText(
+                        requireContext(),
+                        R.string.ai_provider_reset_done,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    refreshCurrentDetail()
+                    refreshProviders()
+                    refreshMain()
+                }
+            },
+        )
     }
 
     private fun confirmDeleteCurrentProvider() {
