@@ -26,8 +26,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import io.legado.app.R
+import io.legado.app.ui.design.components.NgManagementListCardVariant
 import io.legado.app.ui.design.components.NgManagementTrailing
 import io.legado.app.ui.design.components.NgStatusTagSpec
+import io.legado.app.ui.design.components.NgStatusTagStyle
 import io.legado.app.ui.design.components.NgStatusTagVariant
 import io.legado.app.ui.design.components.compose.NgExpandableActionMenu
 import io.legado.app.ui.design.components.compose.NgExpandableActionMenuItem
@@ -71,9 +73,12 @@ internal data class AiProviderListScreenState(
 internal data class AiProviderListItemUiModel(
     val id: String,
     val name: String,
+    val summary: String = "",
     @param:DrawableRes val iconRes: Int,
     val enabled: Boolean,
     val modelCountText: String,
+    val modelCountWarning: Boolean = false,
+    val keyConfigured: Boolean = true,
     val reorderable: Boolean = true,
     val deletable: Boolean = false
 )
@@ -168,6 +173,47 @@ internal fun AiProviderListScreen(
                 ) { provider ->
                     val canReorder = state.canRequestReorder(provider)
                     val dragDescription = stringResource(R.string.ai_provider_drag_sort)
+                    val hasDomain = provider.summary.isNotBlank()
+                    val statusTags = buildList {
+                        add(
+                            NgStatusTagSpec(
+                                text = stringResource(
+                                    if (provider.enabled) {
+                                        R.string.enabled
+                                    } else {
+                                        R.string.disabled
+                                    }
+                                ),
+                                variant = if (provider.enabled) {
+                                    NgStatusTagVariant.SUCCESS
+                                } else {
+                                    NgStatusTagVariant.WARNING
+                                },
+                                style = NgStatusTagStyle.COMPACT,
+                            )
+                        )
+                        if (provider.keyConfigured) {
+                            add(
+                                NgStatusTagSpec(
+                                    text = provider.modelCountText,
+                                    variant = if (provider.modelCountWarning) {
+                                        NgStatusTagVariant.WARNING
+                                    } else {
+                                        NgStatusTagVariant.INFO
+                                    },
+                                    style = NgStatusTagStyle.COMPACT,
+                                )
+                            )
+                        } else {
+                            add(
+                                NgStatusTagSpec(
+                                    text = stringResource(R.string.ai_provider_no_api_key),
+                                    variant = NgStatusTagVariant.WARNING,
+                                    style = NgStatusTagStyle.COMPACT,
+                                )
+                            )
+                        }
+                    }
                     NgSwipeToDelete(
                         deletable = provider.deletable,
                         reordering = reorderState.isDragging,
@@ -180,6 +226,14 @@ internal fun AiProviderListScreen(
                     ) {
                         NgManagementListCard(
                             title = provider.name,
+                            variant = NgManagementListCardVariant.PROVIDER_TWO_ROW,
+                            summaryTag = provider.summary.takeIf { hasDomain }?.let {
+                                NgStatusTagSpec(
+                                    text = it,
+                                    variant = NgStatusTagVariant.INFO,
+                                    style = NgStatusTagStyle.COMPACT,
+                                )
+                            },
                             containerColor = colorResource(
                                 R.color.ng_translucent_management_card_surface
                             ),
@@ -187,26 +241,8 @@ internal fun AiProviderListScreen(
                                 R.color.ng_translucent_management_card_stroke
                             ),
                             borderWidth = 0.6.dp,
-                            detailTags = listOf(
-                                NgStatusTagSpec(
-                                    text = stringResource(
-                                        if (provider.enabled) {
-                                            R.string.enabled
-                                        } else {
-                                            R.string.disabled
-                                        }
-                                    ),
-                                    variant = if (provider.enabled) {
-                                        NgStatusTagVariant.SUCCESS
-                                    } else {
-                                        NgStatusTagVariant.WARNING
-                                    }
-                                ),
-                                NgStatusTagSpec(
-                                    text = provider.modelCountText,
-                                    variant = NgStatusTagVariant.INFO
-                                )
-                            ),
+                            headerTags = if (hasDomain) statusTags else emptyList(),
+                            detailTags = if (hasDomain) emptyList() else statusTags,
                             trailingContent = if (canReorder) {
                                 {
                                     NgManagementTrailingIcon(

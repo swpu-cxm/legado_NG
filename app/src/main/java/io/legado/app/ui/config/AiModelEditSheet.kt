@@ -22,6 +22,7 @@ import io.legado.app.R
 import io.legado.app.help.ai.AiModel
 import io.legado.app.help.ai.AiModelAbility
 import io.legado.app.help.ai.AiModelModality
+import io.legado.app.help.ai.AiModelRegistry
 import io.legado.app.help.ai.AiModelType
 import io.legado.app.ui.design.components.compose.NgFlatActionRail
 import io.legado.app.ui.design.components.compose.NgFlatActionRailItem
@@ -40,6 +41,38 @@ internal data class AiModelEditDraft(
     val abilities: Set<AiModelAbility>,
 )
 
+internal data class AiModelCapabilityDefaults(
+    val type: AiModelType,
+    val inputModalities: Set<AiModelModality>,
+    val outputModalities: Set<AiModelModality>,
+    val abilities: Set<AiModelAbility>,
+)
+
+/**
+ * 按模型 id 从内置注册表推导能力。注册表没有匹配规则时返回 null，
+ * 避免把未知模型静默重置成聊天模型。
+ */
+internal fun AiModel.registryCapabilityDefaults(): AiModelCapabilityDefaults? {
+    val modelId = safeId()
+    if (modelId.isBlank() || AiModelRegistry.shouldClearDeclaredCapabilities(modelId)) {
+        return null
+    }
+    val capabilities = AiModelRegistry.capabilities(modelId)
+    val hasRegistryRule = capabilities.type != null ||
+        capabilities.inputModalities.isNotEmpty() ||
+        capabilities.outputModalities.isNotEmpty() ||
+        capabilities.abilities.isNotEmpty()
+    if (!hasRegistryRule) {
+        return null
+    }
+    return AiModelCapabilityDefaults(
+        type = capabilities.type ?: AiModelType.CHAT,
+        inputModalities = capabilities.inputModalities.toSet(),
+        outputModalities = capabilities.outputModalities.toSet(),
+        abilities = capabilities.abilities.toSet(),
+    )
+}
+
 @Composable
 internal fun AiModelEditSheet(
     model: AiModel,
@@ -57,6 +90,8 @@ internal fun AiModelEditSheet(
         mutableStateOf(model.safeOutputModalities().toSet())
     }
     var abilities by remember(model) { mutableStateOf(model.safeAbilities().toSet()) }
+    val registryDefaults = remember(model) { model.registryCapabilityDefaults() }
+    var showRestoreConfirmation by remember(model) { mutableStateOf(false) }
     val modelTypes = listOf(
         AiModelType.CHAT,
         AiModelType.IMAGE,
@@ -93,6 +128,12 @@ internal fun AiModelEditSheet(
     ) {
         NgLongDrawerHeader(
             title = stringResource(R.string.ai_edit_model),
+            navigationIconRes = if (registryDefaults != null) R.drawable.ic_restore else null,
+            navigationContentDescription = stringResource(R.string.ai_model_restore_capabilities),
+            navigationActive = true,
+            onNavigationClick = registryDefaults?.let {
+                { showRestoreConfirmation = true }
+            },
             actionIconRes = R.drawable.ic_save,
             actionContentDescription = stringResource(R.string.save),
             actionActive = true,
@@ -192,6 +233,22 @@ internal fun AiModelEditSheet(
                 Spacer(Modifier.navigationBarsPadding())
             }
         }
+    }
+    if (showRestoreConfirmation && registryDefaults != null) {
+        ConfigConfirmationDialog(
+            title = stringResource(R.string.ai_model_restore_capabilities),
+            message = stringResource(R.string.ai_model_restore_capabilities_message),
+            cancelText = stringResource(R.string.cancel),
+            confirmText = stringResource(R.string.confirm),
+            onDismissRequest = { showRestoreConfirmation = false },
+            onConfirm = {
+                showRestoreConfirmation = false
+                selectedType = registryDefaults.type
+                inputModalities = registryDefaults.inputModalities
+                outputModalities = registryDefaults.outputModalities
+                abilities = registryDefaults.abilities
+            },
+        )
     }
 }
 
